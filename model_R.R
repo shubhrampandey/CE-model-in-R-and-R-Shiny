@@ -1,0 +1,151 @@
+
+
+# General Parameters ------------------------------------------------------
+
+timeHorizon = 25
+nStates = 4
+cohortSize = 100
+statesName = c("Healthy", "Ill", "Very ill", "Dead")
+
+
+
+# Clinical parameters ------------------------------------------------
+
+tpA2A = 0.685 # Transition Probability from Healthy (A) to Healthy (A)
+tpA2B = 0.152 # Transition Probability from Healthy (A) to Ill (B)
+tpA2C = 0.123 # Transition Probability from Healthy (A) to Very Ill (C)
+tpA2D = 0.04  # Transition Probability from Healthy (A) to dead (D)
+tpB2B = 0.596 # Transition Probability from Ill (B) to Ill (B)
+tpB2C = 0.359 # Transition Probability from Ill (B) to very Ill (C)
+tpB2D = 0.045 # Transition Probability from Ill (B) to dead (D)
+tpC2C = 0.762 # Transition Probability from Very Ill (C) to Very Ill (C)
+tpC2D = 0.238 # Transition Probability from Very Ill (C) to Dead (D)
+tpD2D = 1     # Transition Probability from Dead (D) to Dead (D)
+RR = 0.728    # Treatment effect (relative risk)
+
+
+
+# Cost Parameters ---------------------------------------------------------
+
+drugCostTest = 4500 # Test drug cost
+drugCostGold = 2000 # Gold standard drug cost
+adminCostTest = 850 # Test drug admin cost
+adminCostGold = 450 # Gold standard drug admin cost
+hsmCostHealthy = 5000 # Health state management cost healthy
+hsmCostIll = 7000 # Health state management cost Ill
+hsmCostVeryIll = 12000 # Health state management cost Very Ill
+otherCostHealthy = 3000 # Other health states specific cost Healthy
+otherCostIll = 6000 # Other health states specific cost Ill
+otherCostVeryIll = 9000 # Other health states specific cost Very Ill
+deathCost = 10000 # Death related cost
+
+
+# Utility Inputs -----------------------------------------------------------
+
+hsuvHealthy = 0.9 # Health state based utility value Healthy
+hsuvIll = 0.65 # Health state based utility value Ill
+hsuvVeryIll = 0.2 # Health state based utility value Very Ill
+
+
+# Clinical parameters -----------------------------------------------------
+
+# Transition probability matrix for Gold standard drug
+
+transMatGold = matrix(c(tpA2A,tpA2B,tpA2C,tpA2D,
+                          0  ,tpB2B,tpB2C,tpB2D,
+                          0  ,  0  ,tpC2C,tpC2D,
+                          0  ,  0  ,  0  ,tpD2D
+                        ),
+                      nrow = nStates,
+                      byrow = T,
+                      dimnames = list(from = statesName, to = statesName)
+                      )
+print(transMatGold) # Printing the transition probability matrix
+print(rowSums(transMatGold)) # Checking if all the rows summing equal to 1
+
+# Transition probability matrix for Gold standard drug
+
+transMatTest = matrix(c(1-(tpA2B+tpA2C+tpA2D)*RR, tpA2B*RR           ,   tpA2C*RR    , tpA2D*RR,
+                                0               , 1-(tpB2C+tpB2D)*RR ,   tpB2C*RR    , tpB2D*RR,
+                                0               ,         0          , 1-(tpC2D*RR)  , tpC2D*RR,
+                                0               ,         0          ,     0         ,   tpD2D
+                      ),
+                      nrow = nStates,
+                      byrow = T,
+                      dimnames = list(from = statesName, to = statesName)
+                      )
+
+print(transMatTest) # Printing the transition probability matrix
+print(rowSums(transMatTest)) # Checking if all the rows summing equal to 1
+
+
+# State membership Calculation --------------------------------------------
+
+stateMembershipGold = array(NA_real_, dim = c(timeHorizon+1,nStates), dimnames = list(cycle = 0:(timeHorizon), state = statesName))
+stateMembershipGold[1, ] <- c(cohortSize,0,0,0)
+for (i in 2:(timeHorizon+1)) {
+  stateMembershipGold[i, ]<- stateMembershipGold[i-1, ]%*%transMatGold
+}
+rowSums(stateMembershipGold)
+
+stateMembershipTest = array(NA_real_, dim = c(timeHorizon+1,nStates), dimnames = list(cycle = 0:(timeHorizon), state = statesName))
+stateMembershipTest[1, ] <- c(cohortSize,0,0,0)
+for (i in 2:(timeHorizon+1)) {
+  stateMembershipTest[i, ]<- stateMembershipTest[i-1, ]%*%transMatTest
+}
+rowSums(stateMembershipTest)
+
+
+# QALYs Calculations ------------------------------------------------------
+
+# Creation of utility values matrix
+QALYMat = matrix(c(hsuvHealthy, hsuvIll, hsuvVeryIll, 0), 
+                                 nrow = 4, 
+                                 ncol = 1, 
+                                 byrow = FALSE, 
+                                 dimnames = list(state = statesName, payoff = c("QALYS")))
+
+stateMembershipQALYGold = stateMembershipGold %*% QALYMat # Creation of utility values matrix for Gold standard drug
+stateMembershipQALYTest = stateMembershipTest %*% QALYMat # Creation of utility values matrix for Test drug
+
+
+# Cost calculations -------------------------------------------------------
+
+# Creation of Gold standard drug cost matrix 
+costMatGold = matrix(c(drugCostGold + adminCostGold + hsmCostHealthy + otherCostHealthy, # Healthy state costs
+                       drugCostGold + adminCostGold + hsmCostIll + otherCostIll,         # Ill state costs
+                       drugCostGold + adminCostGold + hsmCostVeryIll + otherCostVeryIll, # Very Ill state costs
+                       deathCost), # Death state costs
+                 nrow = 4, 
+                 ncol = 1, 
+                 byrow = FALSE, 
+                 dimnames = list(state = statesName, payoff = c("Costs")))
+
+# Creation of Test drug cost matrix 
+costMatTest = matrix(c(drugCostTest + adminCostTest + hsmCostHealthy + otherCostHealthy, # Healthy state costs
+                       drugCostTest + adminCostTest + hsmCostIll + otherCostIll,         # Ill state costs
+                       drugCostTest + adminCostTest + hsmCostVeryIll + otherCostVeryIll, # Very Ill state costs
+                       deathCost), # Death state costs
+                     nrow = 4, 
+                     ncol = 1, 
+                     byrow = FALSE, 
+                     dimnames = list(state = statesName, payoff = c("Costs")))
+
+stateMembershipCostGold = stateMembershipGold %*% costMatGold # Creation of cost matrix for Gold standard drug
+stateMembershipCostTest = stateMembershipTest %*% costMatTest # Creation of cost matrix for Test drug
+
+
+# ICER calculation --------------------------------------------------------
+
+totalCostTest = colSums(stateMembershipCostTest)/cohortSize # Total Test drug costs
+totalCostGold = colSums(stateMembershipCostGold)/cohortSize # Total gold standard drug costs
+
+totalQALYTest = colSums(stateMembershipQALYTest)/cohortSize # Total Test drug QALYs
+totalQALYGold = colSums(stateMembershipQALYGold)/cohortSize # Total gold standard drug QALYs
+
+incrementalCost = totalCostTest - totalCostGold # Incremental cost
+incrementalQALY = totalQALYTest - totalQALYGold # Incremental QALYs
+
+ICER = incrementalCost / incrementalQALY # Incremental cost-effectiveness ratio
+ICER
+names(ICER) = "ICER"
