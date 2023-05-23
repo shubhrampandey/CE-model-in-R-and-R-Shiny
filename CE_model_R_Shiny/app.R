@@ -9,7 +9,7 @@ library(plotly)
 # Define UI for application that draws a histogram
 ui <-   fluidPage(
   title = "CE model R Shiny",
-  # theme = 
+  theme =shinytheme(theme = "cerulean"),
   navbarPage("Cost Effectiveness Model to evaluate Test drug versus gold standard",
              tabPanel("Inputs",
                       h2("General parameters"),
