@@ -7,8 +7,6 @@ nStates = 4
 cohortSize = 100
 statesName = c("Healthy", "Ill", "Very ill", "Dead")
 
-
-
 # Clinical parameters ------------------------------------------------
 
 tpA2A = 0.685 # Transition Probability from Healthy (A) to Healthy (A)
